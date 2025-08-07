@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgraded IoT Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Custom Tailwind CSS configuration can be added here if needed
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">IoT Monitoring Dashboard</h1>
+            <p class="text-gray-500">Real-time sensor data and system status</p>
+        </header>
+
+        <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-semibold text-gray-700 mb-4">System Status</h2>
+                <div class="flex items-center space-x-4">
+                    <div id="status-indicator" class="w-4 h-4 rounded-full bg-yellow-400 animate-pulse"></div>
+                    <span id="status-text" class="text-xl font-bold text-gray-800">Connecting...</span>
+                </div>
+                <p class="text-sm text-gray-500 mt-2">Last update: <span id="last-update">N/A</span></p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-semibold text-gray-700 mb-2">Temperature</h2>
+                <p class="text-4xl font-bold text-gray-900"><span id="temp-value">--.-</span>&deg;C</p>
+                <p class="text-sm text-gray-500">Current sensor reading</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-semibold text-gray-700 mb-2">Humidity</h2>
+                <p class="text-4xl font-bold text-gray-900"><span id="humidity-value">--.-</span>%</p>
+                <p class="text-sm text-gray-500">Current sensor reading</p>
+            </div>
+
+            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-semibold text-gray-700 mb-4">Temperature History (Last 20 readings)</h2>
+                <canvas id="tempChart"></canvas>
+            </div>
+
+            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-semibold text-gray-700 mb-4">Humidity History (Last 20 readings)</h2>
+                <canvas id="humidityChart"></canvas>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-semibold text-gray-700 mb-4">Device Control</h2>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">Onboard LED</span>
+                    <button id="led-toggle-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        Toggle LED
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const lastUpdate = document.getElementById('last-update');
+        const tempValue = document.getElementById('temp-value');
+        const humidityValue = document.getElementById('humidity-value');
+        const ledToggleButton = document.getElementById('led-toggle-btn');
+
+        // --- WebSocket Connection ---
+        // Use wss:// for secure connections in production
+        const WS_URL = `ws://${window.location.host}`;
+        const socket = new WebSocket(WS_URL);
+
+        socket.onopen = () => {
+            console.log('WebSocket connection established.');
+            statusIndicator.classList.remove('bg-yellow-400', 'animate-pulse');
+            statusIndicator.classList.add('bg-green-500');
+            statusText.textContent = 'Connected';
+            
+            // Subscribe to topics
+            socket.send(JSON.stringify({ type: 'subscribe', topic: 'iot/device/data' }));
+            socket.send(JSON.stringify({ type: 'subscribe', topic: 'iot/device/status' }));
+        };
+
+        socket.onclose = () => {
+            console.log('WebSocket connection closed.');
+            statusIndicator.classList.remove('bg-green-500');
+            statusIndicator.classList.add('bg-red-500');
+            statusText.textContent = 'Disconnected';
+        };
+
+        socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            statusIndicator.classList.remove('bg-green-500');
+            statusIndicator.classList.add('bg-red-500');
+            statusText.textContent = 'Error';
+        };
+
+        // --- Chart.js Initialization ---
+        const createChart = (ctx, label) => {
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels:,
+                    datasets: [{
+                        label: label,
+                        data:,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.3,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    },
+                    animation: {
+                        duration: 250
+                    }
+                }
+            });
+        };
+
+        const tempChart = createChart(document.getElementById('tempChart').getContext('2d'), 'Temperature (°C)');
+        const humidityChart = createChart(document.getElementById('humidityChart').getContext('2d'), 'Humidity (%)');
+        const MAX_DATA_POINTS = 20;
+
+        const addDataToChart = (chart, label, data) => {
+            chart.data.labels.push(label);
+            chart.data.datasets.forEach((dataset) => {
+                dataset.data.push(data);
+            });
+
+            if (chart.data.labels.length > MAX_DATA_POINTS) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach((dataset) => {
+                    dataset.data.shift();
+                });
+            }
+            chart.update();
+        };
+
+        // --- Message Handling ---
+        socket.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                const { topic, payload } = message;
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+
+                console.log(`Received on topic "${topic}":`, payload);
+                lastUpdate.textContent = now.toLocaleString();
+
+                if (topic === 'iot/device/data') {
+                    const data = JSON.parse(payload);
+                    if (data.temperature!== undefined) {
+                        tempValue.textContent = data.temperature.toFixed(1);
+                        addDataToChart(tempChart, timeString, data.temperature);
+                    }
+                    if (data.humidity!== undefined) {
+                        humidityValue.textContent = data.humidity.toFixed(1);
+                        addDataToChart(humidityChart, timeString, data.humidity);
+                    }
+                } else if (topic === 'iot/device/status') {
+                    // Handle status messages if needed
+                }
+
+            } catch (e) {
+                console.error('Error parsing message:', e);
+            }
+        };
+
+        // --- Control Logic ---
+        ledToggleButton.addEventListener('click', () => {
+            const message = {
+                type: 'publish',
+                topic: 'iot/device/command',
+                payload: 'TOGGLE_LED'
+            };
+            socket.send(JSON.stringify(message));
+            console.log('Sent TOGGLE_LED command');
+        });
+
+    </script>
+</body>
+</html>

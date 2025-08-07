@@ -1,0 +1,22 @@
+{
+  "name": "iot-dashboard-backend",
+  "version": "2.0.0",
+  "description": "A secure MQTT to WebSocket proxy for an IoT dashboard.",
+  "main": "mqtt-proxy.js",
+  "scripts": {
+    "start": "node mqtt-proxy.js",
+    "dev": "nodemon mqtt-proxy.js",
+    "lint": "eslint.",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Your Name",
+  "license": "ISC",
+  "dependencies": {
+    "mqtt": "^5.3.5",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "nodemon": "^3.0.3"
+  }
+}
