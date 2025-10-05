@@ -3,207 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upgraded IoT Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        // Custom Tailwind CSS configuration can be added here if needed
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
+    <title>ESP32 Water Flow Control Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0a0e14; --secondary-bg: #161b22; --border-color: #30363d;
+            --primary-text: #c9d1d9; --heading-text: #58a6ff; --success-color: #238636;
+            --success-glow: rgba(35, 134, 54, 0.5); --error-color: #da3633;
+            --error-glow: rgba(218, 54, 51, 0.4); --pending-color: #dbab09;
+            --water-color: #3e92cc; --water-color-light: #6ab1d7;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--primary-bg); color: var(--primary-text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: var(--heading-text); font-size: clamp(1.8rem, 5vw, 2.5rem); margin-bottom: 5px; }
+        .dashboard-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 25px; width: 100%; max-width: 800px; }
+        .panel { background: linear-gradient(145deg, #1a2029, #13171f); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; text-align: center; position: relative; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .panel.online-device { border-color: var(--success-color); box-shadow: 0 0 20px var(--success-glow); }
+        .panel.offline-device { border-color: var(--error-color); box-shadow: 0 0 15px var(--error-glow); }
+        .panel-header { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 25px; }
+        .panel-header svg { width: 28px; height: 28px; color: var(--heading-text); }
+        .panel-header h2 { color: var(--heading-text); font-size: 1.6em; margin: 0; }
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn { padding: 15px 20px; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; color: white; }
+        .btn:disabled { cursor: not-allowed; opacity: 0.6; }
+        .btn-on { background: linear-gradient(145deg, #28a745, #218838); }
+        .btn-off { background: linear-gradient(145deg, #dc3545, #c82333); }
+        .status-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; margin-bottom: 12px; background: var(--primary-bg); border-left: 5px solid var(--heading-text); border-radius: 8px; }
+        .status-label { font-weight: 500; opacity: 0.9; }
+        .status-value { font-weight: 700; }
+        .status-on { color: var(--success-color); }
+        .status-off { color: var(--error-color); }
+        .status-pending { color: var(--pending-color); }
+        .device-status-indicator { position: absolute; top: 15px; right: 20px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .device-status-indicator.online { background-color: var(--success-color); color: white; animation: pulse 2s infinite; }
+        .device-status-indicator.offline { background-color: var(--error-color); color: white; }
+        .toast-notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 10px; color: white; font-weight: 600; z-index: 1000; transition: all 0.5s ease; }
+        .toast-notification.show { bottom: 20px; }
+        .toast-notification.success { background-color: var(--success-color); }
+        .toast-notification.error { background-color: var(--error-color); }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--success-glow); } 70% { box-shadow: 0 0 0 10px rgba(35, 134, 54, 0); } 100% { box-shadow: 0 0 0 0 rgba(35, 134, 54, 0); } }
+    </style>
 </head>
-<body class="bg-gray-100 font-sans">
-
-    <div class="container mx-auto p-4 md:p-8">
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-800">IoT Monitoring Dashboard</h1>
-            <p class="text-gray-500">Real-time sensor data and system status</p>
-        </header>
-
-        <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-lg font-semibold text-gray-700 mb-4">System Status</h2>
-                <div class="flex items-center space-x-4">
-                    <div id="status-indicator" class="w-4 h-4 rounded-full bg-yellow-400 animate-pulse"></div>
-                    <span id="status-text" class="text-xl font-bold text-gray-800">Connecting...</span>
-                </div>
-                <p class="text-sm text-gray-500 mt-2">Last update: <span id="last-update">N/A</span></p>
-            </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-lg font-semibold text-gray-700 mb-2">Temperature</h2>
-                <p class="text-4xl font-bold text-gray-900"><span id="temp-value">--.-</span>&deg;C</p>
-                <p class="text-sm text-gray-500">Current sensor reading</p>
-            </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-lg font-semibold text-gray-700 mb-2">Humidity</h2>
-                <p class="text-4xl font-bold text-gray-900"><span id="humidity-value">--.-</span>%</p>
-                <p class="text-sm text-gray-500">Current sensor reading</p>
-            </div>
-
-            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-lg font-semibold text-gray-700 mb-4">Temperature History (Last 20 readings)</h2>
-                <canvas id="tempChart"></canvas>
-            </div>
-
-            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-lg font-semibold text-gray-700 mb-4">Humidity History (Last 20 readings)</h2>
-                <canvas id="humidityChart"></canvas>
-            </div>
-            
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-lg font-semibold text-gray-700 mb-4">Device Control</h2>
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-600">Onboard LED</span>
-                    <button id="led-toggle-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                        Toggle LED
-                    </button>
-                </div>
-            </div>
-
-        </main>
+<body>
+    <div class="header">
+        <h1>Remote Water Flow Control</h1>
+        <p>Using ESP32 & Blynk</p>
     </div>
-
-    <script>
-        // --- DOM Element References ---
-        const statusIndicator = document.getElementById('status-indicator');
-        const statusText = document.getElementById('status-text');
-        const lastUpdate = document.getElementById('last-update');
-        const tempValue = document.getElementById('temp-value');
-        const humidityValue = document.getElementById('humidity-value');
-        const ledToggleButton = document.getElementById('led-toggle-btn');
-
-        // --- WebSocket Connection ---
-        // Use wss:// for secure connections in production
-        const WS_URL = `ws://${window.location.host}`;
-        const socket = new WebSocket(WS_URL);
-
-        socket.onopen = () => {
-            console.log('WebSocket connection established.');
-            statusIndicator.classList.remove('bg-yellow-400', 'animate-pulse');
-            statusIndicator.classList.add('bg-green-500');
-            statusText.textContent = 'Connected';
+    <div class="dashboard-container">
+        <div id="mainPanel" class="panel">
+            <div id="deviceStatus" class="device-status-indicator offline">Offline</div>
+            <div class="panel-header">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm0 1.5a8.25 8.25 0 0 1 8.25 8.25c0 1.983-.703 3.82-1.875 5.25a.75.75 0 0 1-1.06-1.06 6.75 6.75 0 0 0-10.632 0 .75.75 0 0 1-1.06 1.06A8.22 8.22 0 0 1 3.75 12 8.25 8.25 0 0 1 12 3.75Z"/></svg>
+                <h2>System Monitor & Control</h2>
+            </div>
+            <div class="status-item"><span class="status-label">Valve State</span><span class="status-value" id="valveStatus">UNKNOWN</span></div>
+            <div class="status-item"><span class="status-label">Flow Rate</span><span class="status-value" id="flowRate">-- L/min</span></div>
+            <div class="status-item"><span class="status-label">Total Volume</span><span class="status-value" id="totalLiters">-- Liters</span></div>
+            <div class="status-item"><span class="status-label">Last Update</span><span class="status-value" id="lastUpdate">Never</span></div>
             
-            // Subscribe to topics
-            socket.send(JSON.stringify({ type: 'subscribe', topic: 'iot/device/data' }));
-            socket.send(JSON.stringify({ type: 'subscribe', topic: 'iot/device/status' }));
+            <div class="button-group" style="margin-top: 30px;" id="controlButtons">
+                <button class="btn btn-on" data-command="1">Open Valve</button>
+                <button class="btn btn-off" data-command="0">Close Valve</button>
+            </div>
+        </div>
+    </div>
+    <div id="toast" class="toast-notification"></div>
+    
+    <script>
+        const BLYNK_PROXY_ENDPOINT = "/api/blynk-proxy";
+        const STATUS_REFRESH_INTERVAL = 5000; // 5 seconds
+        const MAX_DATA_AGE_SECONDS = 30; // Consider device offline if last update is older than this
+
+        let systemState = { data: null, isCommandPending: false };
+        let statusIntervalId = null; 
+
+        // UI elements cache
+        const ui = {};
+
+        const showToast = (message, type = 'error') => {
+            ui.toast.textContent = message;
+            ui.toast.className = `toast-notification ${type} show`;
+            setTimeout(() => { ui.toast.className = 'toast-notification'; }, 3000);
         };
 
-        socket.onclose = () => {
-            console.log('WebSocket connection closed.');
-            statusIndicator.classList.remove('bg-green-500');
-            statusIndicator.classList.add('bg-red-500');
-            statusText.textContent = 'Disconnected';
+        const formatTimeAgo = (isoString) => {
+            if (!isoString) return "Never";
+            const seconds = Math.round((new Date() - new Date(isoString)) / 1000);
+            if (seconds < 5) return "Just now";
+            if (seconds < 60) return `${seconds}s ago`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            return `${hours}h ago`;
         };
 
-        socket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            statusIndicator.classList.remove('bg-green-500');
-            statusIndicator.classList.add('bg-red-500');
-            statusText.textContent = 'Error';
+        const isDeviceOnline = (data) => {
+            if (!data || !data.heartbeat || !data.heartbeat.timestamp) return false;
+            const isStale = (new Date() - new Date(data.heartbeat.timestamp)) / 1000 > MAX_DATA_AGE_SECONDS;
+            return !isStale && data.heartbeat.value === 1;
         };
 
-        // --- Chart.js Initialization ---
-        const createChart = (ctx, label) => {
-            return new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels:,
-                    datasets: [{
-                        label: label,
-                        data:,
-                        borderColor: 'rgb(59, 130, 246)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.3,
-                        fill: true,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: false
-                        }
-                    },
-                    animation: {
-                        duration: 250
-                    }
-                }
-            });
-        };
+        const updateUI = () => {
+            const data = systemState.data;
+            const isOnline = isDeviceOnline(data);
 
-        const tempChart = createChart(document.getElementById('tempChart').getContext('2d'), 'Temperature (°C)');
-        const humidityChart = createChart(document.getElementById('humidityChart').getContext('2d'), 'Humidity (%)');
-        const MAX_DATA_POINTS = 20;
+            // Update panel and indicator
+            ui.deviceStatus.textContent = isOnline ? 'Online' : 'Offline';
+            ui.deviceStatus.className = `device-status-indicator ${isOnline ? 'online' : 'offline'}`;
+            ui.mainPanel.classList.toggle('online-device', isOnline);
+            ui.mainPanel.classList.toggle('offline-device', !isOnline);
 
-        const addDataToChart = (chart, label, data) => {
-            chart.data.labels.push(label);
-            chart.data.datasets.forEach((dataset) => {
-                dataset.data.push(data);
-            });
+            // Update buttons
+            ui.controlButtons.querySelectorAll('button').forEach(btn => btn.disabled = !isOnline || systemState.isCommandPending);
 
-            if (chart.data.labels.length > MAX_DATA_POINTS) {
-                chart.data.labels.shift();
-                chart.data.datasets.forEach((dataset) => {
-                    dataset.data.shift();
-                });
+            if (systemState.isCommandPending) {
+                ui.valveStatus.textContent = 'Pending...';
+                ui.valveStatus.className = 'status-value status-pending';
+            } else if (isOnline && data && data.valve_control) {
+                const state = data.valve_control.value === 1 ? 'OPEN' : 'CLOSED';
+                ui.valveStatus.textContent = state;
+                ui.valveStatus.className = `status-value status-${state === 'OPEN' ? 'on' : 'off'}`;
+            } else {
+                ui.valveStatus.textContent = 'UNKNOWN';
+                ui.valveStatus.className = 'status-value';
             }
-            chart.update();
+
+            ui.flowRate.textContent = isOnline && data.flow_rate ? `${Number(data.flow_rate.value).toFixed(2)} L/min` : '-- L/min';
+            ui.totalLiters.textContent = isOnline && data.liters ? `${Number(data.liters.value).toFixed(3)} Liters` : '-- Liters';
+            ui.lastUpdate.textContent = isOnline ? formatTimeAgo(data.heartbeat.timestamp) : 'Never';
         };
 
-        // --- Message Handling ---
-        socket.onmessage = (event) => {
+        const handleCommand = async (command) => {
+            systemState.isCommandPending = true;
+            ui.controlButtons.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            updateUI(); 
+
             try {
-                const message = JSON.parse(event.data);
-                const { topic, payload } = message;
-                const now = new Date();
-                const timeString = now.toLocaleTimeString();
-
-                console.log(`Received on topic "${topic}":`, payload);
-                lastUpdate.textContent = now.toLocaleString();
-
-                if (topic === 'iot/device/data') {
-                    const data = JSON.parse(payload);
-                    if (data.temperature!== undefined) {
-                        tempValue.textContent = data.temperature.toFixed(1);
-                        addDataToChart(tempChart, timeString, data.temperature);
-                    }
-                    if (data.humidity!== undefined) {
-                        humidityValue.textContent = data.humidity.toFixed(1);
-                        addDataToChart(humidityChart, timeString, data.humidity);
-                    }
-                } else if (topic === 'iot/device/status') {
-                    // Handle status messages if needed
+                const response = await fetch(BLYNK_PROXY_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'send_valve_command', payload: command })
+                });
+                if (!response.ok) {
+                    const errorDetails = (await response.json()).details || `HTTP ${response.status}`;
+                    throw new Error(errorDetails);
                 }
-
-            } catch (e) {
-                console.error('Error parsing message:', e);
+                showToast(`Command sent successfully.`, 'success');
+                // Fetch status sooner to reflect the change quickly
+                setTimeout(getSystemStatus, 1500);
+            } catch (error) {
+                showToast(`Command failed: ${error.message}`, 'error');
+                systemState.isCommandPending = false; // Reset on failure
             }
         };
 
-        // --- Control Logic ---
-        ledToggleButton.addEventListener('click', () => {
-            const message = {
-                type: 'publish',
-                topic: 'iot/device/command',
-                payload: 'TOGGLE_LED'
-            };
-            socket.send(JSON.stringify(message));
-            console.log('Sent TOGGLE_LED command');
-        });
+        const getSystemStatus = async () => {
+            try {
+                const response = await fetch(BLYNK_PROXY_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'get_system_status' })
+                });
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+                
+                const result = await response.json();
+                systemState.data = result.data;
+                // If a command was pending, it's now resolved by this new data
+                systemState.isCommandPending = false;
+            } catch (error) {
+                console.error("Failed to get system status:", error.message);
+                systemState.data = null; // Clear data on error
+            }
+            updateUI();
+        };
 
+        document.addEventListener('DOMContentLoaded', () => {
+            // Cache all UI elements
+            ui.toast = document.getElementById('toast');
+            ui.mainPanel = document.getElementById('mainPanel');
+            ui.deviceStatus = document.getElementById('deviceStatus');
+            ui.valveStatus = document.getElementById('valveStatus');
+            ui.flowRate = document.getElementById('flowRate');
+            ui.totalLiters = document.getElementById('totalLiters');
+            ui.lastUpdate = document.getElementById('lastUpdate');
+            ui.controlButtons = document.getElementById('controlButtons');
+
+            ui.controlButtons.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON' && !e.target.disabled) {
+                    handleCommand(e.target.dataset.command);
+                }
+            });
+
+            // Initial fetch and start interval
+            getSystemStatus();
+            statusIntervalId = setInterval(getSystemStatus, STATUS_REFRESH_INTERVAL);
+        });
     </script>
 </body>
 </html>
